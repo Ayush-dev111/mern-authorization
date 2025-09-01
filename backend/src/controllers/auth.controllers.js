@@ -1,8 +1,9 @@
 import User from '../models/user.js';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { generateOtp } from '../utils/generateOtp.js';
 import { generateJwtToken } from '../utils/jwtToken.js';
-import { sendVerificationEmail } from '../nodemailer/email.js';
+import { sendResetPasswordEmail, sendResetSuccessMail, sendVerificationEmail } from '../nodemailer/email.js';
 
 
 export const userSignup = async (req, res) => {
@@ -10,10 +11,10 @@ export const userSignup = async (req, res) => {
     try {
 
         //getting user details from request body
-        const {fullName , email, password}= req.body;
+        const { fullName, email, password } = req.body;
 
         // checking from missing fields
-        if(!fullName || !email || !password){
+        if (!fullName || !email || !password) {
             return res.status(400).json({
                 success: false,
                 message: "all fields are required",
@@ -21,8 +22,8 @@ export const userSignup = async (req, res) => {
         };
 
         // checking if user already exists
-        const userAlreadyExists = await User.findOne({email});
-        if(userAlreadyExists){
+        const userAlreadyExists = await User.findOne({ email });
+        if (userAlreadyExists) {
             return res.status(400).json({
                 success: false,
                 message: "user already exists",
@@ -57,7 +58,7 @@ export const userSignup = async (req, res) => {
         res.status(201).json({
             success: true,
             message: "user created successfully",
-            data : {
+            data: {
                 ...user._doc,
                 password: undefined,
                 verificationToken: undefined,
@@ -73,15 +74,15 @@ export const userSignup = async (req, res) => {
     }
 };
 
-export const verifyEmail = async (req, res)=>{
-    const {code} = req.body;
+export const verifyEmail = async (req, res) => {
+    const { code } = req.body;
     try {
         const user = await User.findOne({
             verifyOtp: code,
-            verifyOtpExpires: {$gt: Date.now()},
+            verifyOtpExpires: { $gt: Date.now() },
         });
 
-        if(!user){
+        if (!user) {
             return res.status(400).json({
                 success: false,
                 message: "invalid otp",
@@ -102,20 +103,20 @@ export const verifyEmail = async (req, res)=>{
         console.log("error in verifyEmail route:", error);
     }
 
-}
+};
 
 export const userLogin = async (req, res) => {
-    const {email, password} = req.body;
+    const { email, password } = req.body;
 
-    if(!email || !password){
+    if (!email || !password) {
         return res.status(400).json({
             success: false,
             message: "all fields are required",
         });
     };
 
-    const user = await User.findOne({email});
-    if(!user){
+    const user = await User.findOne({ email });
+    if (!user) {
         return res.status(400).json({
             success: false,
             message: "invalid credentials",
@@ -123,7 +124,7 @@ export const userLogin = async (req, res) => {
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
-    if(!isPasswordCorrect){
+    if (!isPasswordCorrect) {
         return res.status(400).json({
             success: false,
             message: "invalid credentials",
@@ -139,20 +140,130 @@ export const userLogin = async (req, res) => {
     res.status(200).json({
         success: true,
         message: "Login successful",
-        data : {
-                ...user._doc,
-                password: undefined,
-                verificationToken: undefined,
-                verificationTokenExpires: undefined,
-            }
-        });
+        data: {
+            ...user._doc,
+            password: undefined,
+            verificationToken: undefined,
+            verificationTokenExpires: undefined,
+        }
+    });
 
-}  
+};
 
 export const userLogout = async (req, res) => {
-    res.clearCookie("token");
+    res.clearCookie("jwt");
     res.status(200).json({
         success: true,
         message: "logout successful",
     });
+};
+
+export const forgetPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "email is required",
+            })
+        };
+
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "user not found",
+            });
+        }
+
+        //generate reset token
+
+        const resetPasswordToken = crypto.randomBytes(20).toString("hex");
+        const resetPasswordExpires = Date.now() + 1 * 60 * 60 * 1000; // 1 hour
+
+        user.resetPasswordToken = resetPasswordToken;
+        user.resetPasswordExpires = resetPasswordExpires;
+
+        await user.save();
+
+        await sendResetPasswordEmail(user.email, `${process.env.CLIENT_URL}/reset-password/${resetPasswordToken}`);
+
+        res.status(200).json({
+            success: true,
+            message: "Reset password email sent successfully",
+        })
+    } catch (error) {
+        console.log("error in forgetPassword route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const resetPassword = async (req, res)=> {
+    try {
+        const {token} = req.params;
+        const {password} = req.body;
+
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if(!user){
+            return res.status(400).json({
+                success: false,
+                message: "invalid or expires reset token"
+            });
+        };
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+
+        await user.save();
+        sendResetSuccessMail(user.email);
+
+        res.status(200).json({
+            success: true,
+            message: "password reset successfully"
+        });
+
+    } catch (error) {
+        console.log("error in resetPassword route:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    };
+}; 
+
+export const checkAuth = async (req, res)=> {
+    try {
+        const user = await User.findById(req.userId).select("-password");
+
+        if(!user){
+            return res.status(400).json({
+            success: false,
+            message: "User not found",
+            });
+        };
+
+        res.status(200).json({
+            success: true,
+            message: "user Authenticated",
+            data : user
+        })
+
+    } catch (error) {
+         console.log("error in checkAuth:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    };
 };
