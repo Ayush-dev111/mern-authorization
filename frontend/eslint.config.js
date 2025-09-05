@@ -23,10 +23,10 @@ export default defineConfig([
       },
     },
     rules: {
-      // "react/no-unused-var": "off",
+      "no-unused-vars": "off",
       "react/jsx-uses-react": "off",
       "react/prop-types": "off",
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      "react-hooks/exhaustive-deps": "off",
     },
   },
 ])

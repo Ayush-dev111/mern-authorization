@@ -1,9 +1,23 @@
-import React from "react";
+import React, { useEffect } from "react";
 import FloatingShape from "./components/floatingShape";
 import {Route, Routes} from "react-router-dom";
 import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";
+import EmailVerificationPage from "./pages/EmailVerificationPage";
+import DashboardPage from "./pages/DashboardPage";
+import { useAuthStore } from "./Store/authStore";
+import HomePage from "./pages/HomePage";
 const App = () => {
+
+  const {isCheckingAuth, checkAuth, isAuthenticated, user} = useAuthStore();
+
+  useEffect(()=>{
+    checkAuth();
+  }, [checkAuth])
+
+  console.log(isAuthenticated);
+  console.log("user", user);
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-blue-900 flex items-center justify-center relative overflow-hidden">
       {/* Existing ones */}
@@ -18,9 +32,11 @@ const App = () => {
 
 
       <Routes>
-        <Route path='/' element={<h1>Home Page</h1>} />
+        <Route path='/' element={<HomePage/>} />
         <Route path='/signup' element={<SignUpPage />} />
         <Route path='/login' element={<LoginPage />} />
+        <Route path="/verify-email" element={<EmailVerificationPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
       </Routes>
     </div>
   );

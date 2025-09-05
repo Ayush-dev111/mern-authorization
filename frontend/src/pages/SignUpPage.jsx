@@ -1,67 +1,82 @@
-import { useState, React,  } from 'react';
-import {motion} from 'framer-motion';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
 import Input from '../components/Input';
-import {Lock, Mail, User} from 'lucide-react';
-import {Link} from 'react-router-dom'
+import { Loader, Lock, Mail, User } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom'
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
-
+import { useAuthStore } from '../Store/authStore';
 const SignUpPage = () => {
-  const [name ,setName] = useState('');
-  const [email ,setEmail] = useState('');
-  const [password ,setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const { signup, error, isLoading } = useAuthStore();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
+    try {
+      await signup(name, email, password);
+      navigate("/verify-email")
+    } catch (error) {
+      console.log(error);
+    }
   };
 
 
   return (
     <motion.div
-      initial={{opacity: 0, y:20}}
-      animate={{opacity: 1, y:0}}
-      transition={{duration: 0.5}}
-      className='max-w-md w-full bg-gray-800 bg-opacity-50 backdrop-filter backdrop-blur-xl rounded-2xl shadow-xl
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className='max-w-md w-full bg-gray-800 bg-opacity-50 backdrop-filter backdrop-blur-xl rounded-xl shadow-xl
       overflow-hidden'
-      >
+    >
       <div className='p-8'>
-          <h2 className='text-3xl font-bold mb-6 text-center bg-gradient-to-r from-indigo-400 to-blue-500
+        <h2 className='text-3xl font-bold mb-6 text-center bg-gradient-to-r from-indigo-400 to-blue-500
           text-transparent bg-clip-text'>
-            Create Account
-          </h2>
+          Create Account
+        </h2>
         <form onSubmit={handleSubmit}>
-          <Input 
+          <Input
             icon={User}
             type='text'
             placeholder='Full Name'
-            value = {name}
-            onChange= {(e)=>setName(e.target.value)}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
-          <Input 
+          <Input
             icon={Mail}
             type='text'
             placeholder='Email Address'
-            value = {email}
-            onChange= {(e)=>setEmail(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
-          <Input 
+          <Input
             icon={Lock}
             type='text'
             placeholder='Password'
-            value = {password}
-            onChange= {(e)=>setPassword(e.target.value)}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
 
+          {error && <p className='text-red-500 font-semibold mt-2'>{error}</p>}
+
+
+
           {/* Password strength meter */}
-          <PasswordStrengthMeter password={password}/>
+          <PasswordStrengthMeter password={password} />
 
           <motion.button
-           className='mt-5 w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white
+            className='mt-5 w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white
            font-bold rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 focus:outline-none
            focus:ring-2 focus:ring-bule-500 focus: ring-offset-2 focus:ring-offset-gray-900 transition duration-200'
-           whileHover={{scale: 1.02}}
-           whileTap={{scale: 0.98}}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={isLoading}
           >
-            Sign Up
+            {isLoading ? <Loader className='animate-spin mx-auto' size={24} /> : "Sign up"}
+
           </motion.button>
         </form>
       </div>
